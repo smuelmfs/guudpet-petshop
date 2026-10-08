@@ -132,7 +132,7 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLDivElement>(null);
-  const drag = useRef({ x: 0, y: 0, lastX: 0, time: 0, active: false, moved: false });
+  const drag = useRef({ x: 0, y: 0, lastX: 0, time: 0, pointerId: -1, active: false, moved: false });
   const physics = useRef({ velocity: 0, remainder: 0, angle: 0, angularVelocity: 0, period: 0, visible: false, hover: false, focus: false, modal: false, touch: false });
   const reduced = useReducedMotion();
   useEffect(() => { physics.current.modal = modalOpen; if (modalOpen) physics.current.velocity = 0; }, [modalOpen]);
@@ -191,6 +191,7 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
   }, [reduced]);
   const move = (direction: number) => viewport.current?.scrollBy({ left: direction * viewport.current.clientWidth * .8, behavior: reduced ? 'auto' : 'smooth' });
   const finish = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerId !== drag.current.pointerId) return;
     if (event.timeStamp - drag.current.time > 100 || reduced || event.type === 'pointercancel') physics.current.velocity = 0;
     drag.current.active = false;
     event.currentTarget.classList.remove('is-dragging');
@@ -209,11 +210,11 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
       onFocusCapture={(event) => { physics.current.focus = event.target.matches(':focus-visible'); physics.current.velocity = 0; }}
       onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) physics.current.focus = false; }}
       onPointerEnter={(event) => { if (event.pointerType === 'mouse') physics.current.hover = true; positionCursor(event); }}
-      onPointerDown={(event) => { if (event.button !== 0) return; physics.current.velocity = 0; physics.current.remainder = 0; physics.current.touch = event.pointerType === 'touch'; drag.current = { x: event.clientX, y: event.clientY, lastX: event.clientX, time: event.timeStamp, active: true, moved: false }; cursor.current?.classList.add('is-pressed'); }}
+      onPointerDown={(event) => { if (event.button !== 0 || !event.isPrimary) return; physics.current.velocity = 0; physics.current.remainder = 0; physics.current.touch = event.pointerType === 'touch'; drag.current = { x: event.clientX, y: event.clientY, lastX: event.clientX, time: event.timeStamp, pointerId: event.pointerId, active: true, moved: false }; cursor.current?.classList.add('is-pressed'); }}
       onPointerMove={(event) => {
         positionCursor(event);
         const gesture = drag.current;
-        if (!gesture.active) return;
+        if (!gesture.active || event.pointerId !== gesture.pointerId) return;
         const distance = event.clientX - gesture.x;
         const vertical = event.clientY - gesture.y;
         if (!gesture.moved && event.pointerType !== 'mouse' && Math.abs(vertical) > 10 && Math.abs(vertical) > Math.abs(distance)) { finish(event); return; }
@@ -230,7 +231,7 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
           gesture.lastX = event.clientX; gesture.time = event.timeStamp;
         }
       }}
-      onPointerUp={finish} onPointerCancel={(event) => { finish(event); cursor.current?.classList.remove('is-visible'); }} onPointerLeave={(event) => { physics.current.hover = false; cursor.current?.classList.remove('is-visible'); if (event.pointerType === 'touch' || !drag.current.active) return; if (!drag.current.moved) finish(event); }} onLostPointerCapture={() => { drag.current.active = false; viewport.current?.classList.remove('is-dragging'); cursor.current?.classList.remove('is-pressed'); }}
+      onPointerUp={finish} onPointerCancel={(event) => { finish(event); cursor.current?.classList.remove('is-visible'); }} onPointerLeave={(event) => { physics.current.hover = false; cursor.current?.classList.remove('is-visible'); if (event.pointerType === 'touch' || !drag.current.active) return; if (!drag.current.moved) finish(event); }} onLostPointerCapture={(event) => { if (event.target !== event.currentTarget || event.pointerId !== drag.current.pointerId) return; drag.current.active = false; viewport.current?.classList.remove('is-dragging'); cursor.current?.classList.remove('is-pressed'); }}
       onClickCapture={(event) => { if (drag.current.moved) { event.preventDefault(); event.stopPropagation(); drag.current.moved = false; } }}>
       <div ref={track} className="gallery-track">{[0,1,2].map(cycle => <div className="gallery-cycle" key={cycle} aria-hidden={cycle !== 1 ? true : undefined}>{photos.map((photo, index) => <button key={photo.image} className={`gallery-card gallery-card-${index}`} tabIndex={cycle === 1 ? 0 : -1} aria-label={`Ampliar fotografia: ${photo.alt}`} onClick={() => { cursor.current?.classList.remove('is-visible'); physics.current.velocity = 0; onOpen(index); }}><span className="gallery-image"><img src={`/images/${photo.image}.webp`} alt={photo.alt} width="550" height="700" loading="lazy" draggable={false} /></span></button>)}</div>)}</div>
     </div>
@@ -284,10 +285,26 @@ export default function App() {
   const [modal, setModal] = useState<'contact' | number | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [loading, setLoading] = useState(true);
   const map = mapsUrl();
   const telephone = phoneUrl();
   const services = business.services.slice(0, 3);
   const modalOpen = modal !== null;
+
+  useEffect(() => {
+    let active = true;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const heroImage = root.current?.querySelector<HTMLImageElement>('.hero-pets');
+    const ready = Promise.allSettled([document.fonts.ready, heroImage?.decode() ?? Promise.resolve()]);
+    const timeout = window.setTimeout(() => { if (active) setLoading(false); }, 4000);
+    ready.then(() => { if (active) { window.clearTimeout(timeout); setLoading(false); } });
+    return () => { active = false; window.clearTimeout(timeout); document.body.style.overflow = previousOverflow; };
+  }, []);
+
+  useEffect(() => {
+    if (!loading) document.body.style.overflow = '';
+  }, [loading]);
 
   const openModal = (value: 'contact' | number) => {
     lastFocus.current = document.activeElement as HTMLElement;
@@ -388,12 +405,30 @@ export default function App() {
   }, []);
 
   useLayoutEffect(() => {
+    if (loading) return;
     const media = gsap.matchMedia();
     media.add('(prefers-reduced-motion: no-preference)', () => {
+      const sequences = new Map<Element, gsap.core.Timeline>();
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting && entry.boundingClientRect.bottom > 0) return;
+          sequences.get(entry.target)?.play();
+          sequences.delete(entry.target);
+          observer.unobserve(entry.target);
+        });
+      }, { rootMargin: '0px 0px -4% 0px', threshold: 0 });
       const ctx = gsap.context(() => {
+        const reveal = (target: Element | string, build: (sequence: gsap.core.Timeline) => void) => {
+          const element = typeof target === 'string' ? root.current?.querySelector(target) : target;
+          if (!element) return;
+          const sequence = gsap.timeline({ paused: true });
+          build(sequence);
+          sequences.set(element, sequence);
+          observer.observe(element);
+        };
         const intro = gsap.timeline({ defaults: { ease: 'power3.out' } });
-        const textEntry = { x: -18, y: 8, scale: .62, autoAlpha: 0, transformOrigin: 'left bottom', duration: .54, stagger: .014, ease: 'back.out(1.2)' };
-        const blockEntry = { x: -28, y: 8, scale: .96, autoAlpha: 0, transformOrigin: 'left center', duration: .65, ease: 'power3.out' };
+        const textEntry = { x: -14, y: 5, scale: .78, autoAlpha: 0, transformOrigin: 'left bottom', duration: .48, stagger: { amount: .25 }, ease: 'back.out(1.15)' };
+        const blockEntry = { x: -22, y: 6, scale: .98, autoAlpha: 0, transformOrigin: 'left center', duration: .55, ease: 'power3.out' };
         intro.from(header.current, { y: -20, autoAlpha: 0, duration: 0.5 }, 0);
         intro.from('.hero-char, .hero-title-follow .motion-char', { ...textEntry, stagger: .018 }, .18);
         intro.from('.hero-seal', { rotation: -18, y: -12, scale: .75, autoAlpha: 0, duration: .8, ease: 'back.out(1.6)' }, .55);
@@ -403,35 +438,33 @@ export default function App() {
 
         gsap.utils.toArray<HTMLElement>('[data-reveal]').forEach((element) => {
           const letters = element.querySelectorAll('.motion-char');
-          const sequence = gsap.timeline({ scrollTrigger: { trigger: element, start: 'top 88%', once: true } });
+          reveal(element, sequence => {
           if (letters.length) {
             sequence.from(letters, textEntry, .05)
               .from(element.querySelectorAll('.eyebrow, p:not(.footer-title), .button-shell'), { ...blockEntry, stagger: .08 }, .12);
           } else sequence.from(element, blockEntry);
-        });
-        gsap.utils.toArray<HTMLElement>('[data-reveal-group]').forEach((group) => {
-          gsap.from(group.children, {
-            ...blockEntry, stagger: .1,
-            scrollTrigger: { trigger: group, start: 'top 87%', once: true },
           });
         });
-        gsap.timeline({ scrollTrigger: { trigger: '.contact-note', start: 'top 86%', once: true } })
-          .from('.note-heading .motion-char', textEntry)
-          .from('.note-heading .eyebrow, .note-details article', { ...blockEntry, stagger: .1 }, .12);
-        gsap.timeline({ scrollTrigger: { trigger: '.about-art', start: 'top 80%', once: true }, defaults: { ease: 'power3.out', duration: .75, transformOrigin: 'left center' } })
-          .from('.about-photo-frame', { x: -40, y: 16, scale: .92, autoAlpha: 0 })
-          .from('.about-photo-back', { x: -26, scale: .96, autoAlpha: 0 }, .08);
-        gsap.from('.about-secondary', { x: -40, scale: .92, autoAlpha: 0, transformOrigin: 'left center', duration: .75, scrollTrigger: { trigger: '.about-secondary', start: 'top 85%', once: true } });
-        gsap.timeline({ scrollTrigger: { trigger: '.guudpet-way-grid', start: 'top 80%', once: true }, defaults: { ease: 'power3.out' } })
-          .from('.guudpet-way-title .motion-char', textEntry)
-          .from('.guudpet-way-copy > .eyebrow, .guudpet-way-list li', { ...blockEntry, stagger: .1 }, .15)
-          .from('.guudpet-way-image img', { x: -32, y: 22, scale: .9, autoAlpha: 0, duration: .8 }, .1)
-          .from('.guudpet-way-seal', { rotation: -14, scale: .8, autoAlpha: 0, duration: .65, ease: 'back.out(1.4)' }, .45);
-        gsap.from('.review-card', {
-          x: -48, y: 22, scale: .86, transformOrigin: 'left center', autoAlpha: 0, rotation: (index) => [-7, 6, -6, 7][index % 4],
-          duration: .8, stagger: .12, ease: 'back.out(1.15)', clearProps: 'transform,opacity,visibility',
-          scrollTrigger: { trigger: '.reviews-fan', start: 'top 84%', once: true },
+        gsap.utils.toArray<HTMLElement>('[data-reveal-group]').forEach((group) => {
+          reveal(group, sequence => { sequence.from(group.children, { ...blockEntry, stagger: .07 }); });
         });
+        reveal('.contact-note', sequence => { sequence
+          .from('.note-heading .motion-char', textEntry)
+          .from('.note-heading .eyebrow, .note-details article', { ...blockEntry, stagger: .07 }, .1); });
+        reveal('.about-art', sequence => { sequence
+          .from('.about-photo-frame', { x: -30, y: 12, scale: .94, autoAlpha: 0, duration: .65, ease: 'power3.out' })
+          .from('.about-photo-back', { x: -20, scale: .97, autoAlpha: 0, duration: .6 }, .05); });
+        reveal('.about-secondary', sequence => { sequence.from('.about-secondary', { x: -30, scale: .94, autoAlpha: 0, transformOrigin: 'left center', duration: .65 }); });
+        reveal('.guudpet-way-copy', sequence => { sequence
+          .from('.guudpet-way-title .motion-char', textEntry)
+          .from('.guudpet-way-copy > .eyebrow, .guudpet-way-list li', { ...blockEntry, stagger: .07 }, .1); });
+        reveal('.guudpet-way-image', sequence => { sequence
+          .from('.guudpet-way-image img', { x: -26, y: 16, scale: .94, autoAlpha: 0, duration: .65 }, 0)
+          .from('.guudpet-way-seal', { rotation: -14, scale: .85, autoAlpha: 0, duration: .55, ease: 'back.out(1.4)' }, .2); });
+        gsap.utils.toArray<HTMLElement>('.review-card').forEach((card, index) => reveal(card, sequence => { sequence.from(card, {
+          x: -32, y: 14, scale: .92, transformOrigin: 'left center', autoAlpha: 0,
+          duration: .65, rotation: [-7, 6, -6, 7][index % 4], ease: 'back.out(1.15)', clearProps: 'transform,opacity,visibility',
+        }); }));
         const processWrap = root.current?.querySelector<HTMLElement>('.process-list-wrap');
         const processPath = root.current?.querySelector<SVGPathElement>('.process-route-fill');
         const processMarker = root.current?.querySelector<HTMLElement>('.process-traveller');
@@ -473,28 +506,28 @@ export default function App() {
           scrollTrigger: { trigger: '.process-list', start: 'top 70%', end: 'bottom 55%', scrub: .55, invalidateOnRefresh: true, onRefresh: self => { measureRoute(); updateRoute(self.progress); } },
         });
         gsap.utils.toArray<HTMLElement>('.process-step').forEach((step) => {
-          gsap.fromTo(step.querySelector('.process-step-number'), { rotation: -12, scale: .82 }, {
-            keyframes: [{ rotation: 6, scale: 1.12 }, { rotation: -3, scale: 1 }], ease: 'none',
-            scrollTrigger: { trigger: step, start: 'top 78%', end: 'top 48%', scrub: .45 },
-          });
-          gsap.timeline({ scrollTrigger: { trigger: step, start: 'top 84%', once: true }, defaults: { ease: 'power3.out' } })
-            .from(step.querySelector('.process-step-number'), { x: -24, autoAlpha: 0, duration: .65 })
+          gsap.timeline({ scrollTrigger: { trigger: step, start: 'top 94%', end: 'top 50%', scrub: .3 } })
+            .fromTo(step.querySelector('.process-step-number'), { rotation: -10, scale: .88 }, { rotation: 5, scale: 1.1, duration: .55, ease: 'none' })
+            .to(step.querySelector('.process-step-number'), { rotation: -3, scale: 1, duration: .45, ease: 'none' });
+          reveal(step, sequence => { sequence
+            .from(step.querySelector('.process-step-number'), { x: -18, autoAlpha: 0, duration: .55 })
             .from(step.querySelectorAll('.motion-char'), textEntry, .1)
-            .from(step.querySelector('.process-step-copy p'), blockEntry, .2);
+            .from(step.querySelector('.process-step-copy p'), blockEntry, .15); });
         });
-        gsap.timeline({ scrollTrigger: { trigger: '.contact-head', start: 'top 85%', once: true }, defaults: { ease: 'power3.out' } })
+        reveal('.contact-head', sequence => { sequence
           .from('.contact-title-line .motion-char', textEntry)
-          .from('.contact-head > .eyebrow, .contact-head > .button-shell', { ...blockEntry, stagger: .08 }, .15);
-        gsap.from('.gallery-cycle > button', { x: -46, y: 16, scale: .86, autoAlpha: 0, transformOrigin: 'left center', duration: .75, stagger: .04, ease: 'back.out(1.15)', clearProps: 'transform,opacity,visibility', scrollTrigger: { trigger: '.gallery-viewport', start: 'top 85%', once: true } });
-        gsap.utils.toArray<HTMLElement>('.faq-item').forEach((item, index) => {
-          gsap.from(item, { ...blockEntry, delay: index * .045, scrollTrigger: { trigger: item, start: 'top 89%', once: true } });
+          .from('.contact-head > .eyebrow, .contact-head > .button-shell', { ...blockEntry, stagger: .06 }, .1); });
+        // Animate the strip once; individual slides stay available during dragging.
+        reveal('.gallery-viewport', sequence => { sequence.from('.gallery-track', { x: -28, scale: .98, autoAlpha: 0, transformOrigin: 'left center', duration: .6, ease: 'power3.out', clearProps: 'transform,opacity,visibility' }); });
+        gsap.utils.toArray<HTMLElement>('.faq-item').forEach(item => {
+          reveal(item, sequence => { sequence.from(item, blockEntry); });
         });
         gsap.utils.toArray<HTMLElement>('.service-card').forEach((card, index) => {
-          gsap.timeline({ delay: (index % 3) * .1, scrollTrigger: { trigger: card, start: 'top 86%', once: true } })
+          reveal(card, sequence => { sequence
             .from(card, { x: -46, y: 16, scale: .86, autoAlpha: 0, transformOrigin: 'left center', duration: .8, ease: 'back.out(1.15)', clearProps: 'transform,opacity,visibility' })
             .from(card.querySelector('.service-card-art img'), { y: 22, scale: .95, duration: .65, ease: 'power3.out' }, .1)
             .from(card.querySelectorAll('.motion-char'), textEntry, .18)
-            .from(card.querySelector('.service-card-copy p'), { ...blockEntry, x: -16 }, .25);
+            .from(card.querySelector('.service-card-copy p'), { ...blockEntry, x: -16 }, .2); });
         });
       }, root);
       let contextActive = true;
@@ -504,15 +537,17 @@ export default function App() {
       document.fonts?.ready.then(refreshMeasurements);
       return () => {
         contextActive = false;
+        observer.disconnect();
         ctx.revert();
       };
     });
     return () => media.revert();
-  }, []);
+  }, [loading]);
 
-  return <MotionConfig reducedMotion="user"><div ref={root} className="hero-in-view">
+  return <MotionConfig reducedMotion="user"><div ref={root} className="hero-in-view" aria-busy={loading}>
+    <AnimatePresence>{loading && <motion.div className="site-loader" role="status" aria-label="A carregar o site da GuudPet" initial={false} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : .3 }}><img src="/images/logo.webp" alt="GuudPet" width="240" height="80" /><div className="loader-paws" aria-hidden="true"><PawPrint /><PawPrint /><PawPrint /></div><p>Só um instante…</p></motion.div>}</AnimatePresence>
     <a className="skip" href="#main">Saltar para o conteúdo</a>
-    <header className="header-wrap" ref={header}>
+    <header className="header-wrap" ref={header} inert={loading}>
       <div className="navbar-surface">
       <div className="header container">
         <a className="brand" href="#inicio" aria-label="GuudPet — início"><img src="/images/logo.webp" width="190" height="63" alt="GuudPet" /></a>
@@ -529,7 +564,7 @@ export default function App() {
       </div>
     </header>
 
-    <main id="main" tabIndex={-1}>
+    <main id="main" tabIndex={-1} inert={loading}>
       <section className="hero" id="inicio" tabIndex={-1} aria-labelledby="hero-title">
         <div className="hero-copy container">
           <div className="hero-headline">
@@ -632,7 +667,7 @@ export default function App() {
       </div><Wave className="wave-bottom" /></section>
     </main>
 
-    <footer className="site-footer" id="rodape">
+    <footer className="site-footer" id="rodape" inert={loading}>
       <div className="footer-surface">
         <div className="footer-top">
           <div className="footer-farewell" data-reveal><span className="eyebrow">A porta fica aberta</span><p className="footer-title"><AnimatedText text="Volta" /><br /><span><AnimatedText text="sempre!" /></span></p><p className="footer-tagline">GuudPet. Já és de casa.</p></div>
