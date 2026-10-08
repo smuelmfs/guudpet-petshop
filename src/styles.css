@@ -449,6 +449,25 @@ footer{padding-top:96px}.footer-brand p{display:flex;align-items:center;gap:10px
 :root{--background-texture:url('/images/cartoon-doodles.svg');--texture-size:640px 520px;--paw-cursor:url('/cursors/paw-cartoon.png') 18 8,auto;--paw-action-cursor:url('/cursors/paw-pointer-cartoon.png') 18 8,pointer}
 body,.about{background-image:var(--background-texture);background-repeat:repeat;background-size:var(--texture-size)}
 .navbar-surface{background-color:var(--cream)}
+.site-loader{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;background:var(--cream);background-image:var(--background-texture);background-size:var(--texture-size)}
+.site-loader>img{width:220px;height:auto}
+.site-loader>p{margin:0;font-size:16px;font-weight:500;color:var(--muted)}
+.loader-paws{display:flex;gap:18px;color:var(--accent)}
+.loader-paws svg{width:28px;height:28px;animation:loader-step .9s ease-in-out infinite}
+.loader-paws svg:nth-child(2){animation-delay:.15s}.loader-paws svg:nth-child(3){animation-delay:.3s}
+@keyframes loader-step{0%,100%{transform:translateY(0) rotate(-8deg);opacity:.4}50%{transform:translateY(-8px) rotate(6deg);opacity:1}}
+/* Consistent section rhythm after the editorial copy was shortened. */
+.services,.guudpet-way,.reviews{padding-block:128px}
+.about{padding-top:112px}
+.process{padding:128px 0 120px}
+.process-heading{margin-bottom:76px}
+.process-list-wrap{width:min(760px,100%)}
+.faq{padding:112px 0 64px}
+.contact{margin-top:56px}
+.site-footer{padding-top:112px}
+@media(max-width:800px){.services,.guudpet-way,.reviews{padding-block:80px}.about{padding-top:76px}.process{padding:84px 0 76px}.process-heading{margin-bottom:52px}.faq{padding:80px 0 40px}.site-footer{padding-top:72px}}
+@media(max-width:600px){.services,.guudpet-way,.reviews{padding-block:68px}.about{padding-top:64px}.process{padding:72px 0 64px}.process-heading{margin-bottom:42px}.faq{padding:68px 0 32px}.contact{margin-top:28px}.site-footer{padding-top:60px}}
+@media(prefers-reduced-motion:reduce){.loader-paws svg{animation:none;opacity:1}}
 @media(hover:hover) and (pointer:fine){
  html,body,body *{cursor:var(--paw-cursor)}
  html body :is(a,button,summary,[role='button']),html body :is(a,button,summary,[role='button']) *{cursor:var(--paw-action-cursor)}
