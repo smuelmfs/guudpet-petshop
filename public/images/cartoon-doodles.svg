@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="520" viewBox="0 0 640 520">
+  <defs>
+    <g id="paw" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20C7 25 4 31 9 34C13 37 17 32 22 33C28 36 33 33 31 28C29 24 25 19 22 18C18 16 15 17 12 20Z"/>
+      <path d="M7 12C3 10 0 14 3 18C6 22 10 17 7 12ZM14 4C9 3 9 12 13 13C18 13 18 5 14 4ZM24 3C19 2 19 11 23 12C28 13 29 4 24 3ZM33 11C29 9 26 16 29 18C34 21 37 13 33 11Z"/>
+    </g>
+  </defs>
+  <g stroke="#3D2B1F" opacity=".13">
+    <use href="#paw" transform="translate(74 65) rotate(-19 18 18)"/>
+    <use href="#paw" transform="translate(401 322) rotate(22 18 18) scale(.85)"/>
+    <g fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M341 76C330 61 319 73 331 81C341 88 360 73 351 62C345 56 339 63 341 76Z"/>
+      <path d="M182 265C192 248 193 278 202 263S214 276 222 261"/>
+      <path d="M546 181L550 192L560 195L549 198L544 210L543 197L532 193L544 190Z"/>
+      <path d="M97 413L100 401M106 417L114 410M88 411L84 400"/>
+      <path d="M307 454C316 459 321 447 329 452C337 458 341 448 349 453"/>
+      <path d="M555 438C550 432 541 438 546 444C551 450 558 439 563 434C570 428 577 436 574 442"/>
+    </g>
+    <g fill="#3D2B1F" stroke="none">
+      <circle cx="225" cy="99" r="1.8"/><circle cx="231" cy="105" r="1.3"/>
+      <circle cx="498" cy="51" r="1.6"/><circle cx="39" cy="277" r="1.7"/>
+      <circle cx="474" cy="244" r="1.8"/><circle cx="481" cy="250" r="1.2"/>
+      <circle cx="250" cy="380" r="1.7"/>
+    </g>
+  </g>
+</svg>

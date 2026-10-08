@@ -1,0 +1,1 @@
+export default function NotFound(){return <main className="container section"><span className="eyebrow">GuudPet · 404</span><h1 style={{fontFamily:'Comic Cat',fontSize:'clamp(40px,7vw,80px)',fontWeight:400}}>Esta patinha perdeu-se.</h1><p>Não encontrámos esta página.</p><a className="button" href="/">Voltar ao início</a></main>;}

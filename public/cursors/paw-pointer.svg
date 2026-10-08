@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 48 48">
+  <defs><g id="paw">
+    <path d="M5 16C8 12 12 16 14 20C16 25 12 28 8 25C5 23 3 19 5 16Z"/>
+    <path d="M15 5C19 3 23 8 22 13C22 17 17 19 15 15C13 12 12 7 15 5Z"/>
+    <path d="M29 5C34 4 36 10 34 15C32 19 28 17 27 14C26 11 26 7 29 5Z"/>
+    <path d="M38 16C42 12 46 15 44 20C43 25 38 28 36 24C34 22 36 18 38 16Z"/>
+    <path d="M24 22C30 21 31 27 36 31C40 35 39 40 35 42C31 44 28 39 23 40C17 39 15 44 10 41C6 38 9 34 13 30C18 27 17 22 24 22Z"/>
+  </g></defs>
+  <use href="#paw" fill="#FFF6E8" stroke="#FFF6E8" stroke-width="5" stroke-linejoin="round"/>
+  <use href="#paw" fill="#FF71A7" stroke="#3D2B1F" stroke-width="2.3" stroke-linejoin="round"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M17 8Q16 10 17 12M29 9Q28 11 29 12M20 27Q23 24 26 27" stroke="#FFF6E8" stroke-width="2"/>
+    <path d="M12 35L15 38M15 33L18 36M31 37L34 35" stroke="#A93964" stroke-width="1"/>
+    <path d="M21 40Q25 38 29 40" stroke="#3D2B1F" stroke-width=".7"/>
+  </g>
+</svg>
