@@ -129,24 +129,39 @@ function CommonQuestions() {
 }
 
 function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; modalOpen: boolean }) {
+  const [nativeScroll, setNativeScroll] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLDivElement>(null);
   const drag = useRef({ x: 0, y: 0, lastX: 0, time: 0, pointerId: -1, active: false, moved: false });
   const physics = useRef({ velocity: 0, remainder: 0, angle: 0, angularVelocity: 0, period: 0, visible: false, hover: false, focus: false, modal: false, touch: false });
   const reduced = useReducedMotion();
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 800px), (pointer: coarse)');
+    const update = () => setNativeScroll(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
   useEffect(() => { physics.current.modal = modalOpen; if (modalOpen) physics.current.velocity = 0; }, [modalOpen]);
   useEffect(() => {
     const element = viewport.current;
     const strip = track.current;
     if (!element || !strip) return;
     const state = physics.current;
+    drag.current.active = false;
+    drag.current.moved = false;
+    element.classList.remove('is-dragging');
+    cursor.current?.classList.remove('is-visible', 'is-pressed');
+    if (nativeScroll) element.scrollLeft = 0;
     const wrap = () => {
-      if (!state.period) return;
+      if (nativeScroll || !state.period) return;
       if (element.scrollLeft < state.period) element.scrollLeft += state.period;
       else if (element.scrollLeft >= state.period * 2) element.scrollLeft -= state.period;
     };
     const measure = () => {
+      // Touch uses one strip: no repositioning during native scroll momentum.
+      if (nativeScroll) { state.period = 0; return; }
       const cycles = strip.querySelectorAll<HTMLElement>('.gallery-cycle');
       const period = cycles[1].offsetLeft - cycles[0].offsetLeft;
       const phase = state.period ? (element.scrollLeft % state.period) / state.period : 0;
@@ -181,16 +196,17 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
     window.addEventListener('scroll', hideCursor, { passive: true });
     window.addEventListener('blur', hideCursor);
     measure();
-    if (!reduced) gsap.ticker.add(tick);
+    if (!reduced && !nativeScroll) gsap.ticker.add(tick);
     return () => {
       gsap.ticker.remove(tick); observer.disconnect(); visibility.disconnect();
       element.removeEventListener('scroll', wrap); window.removeEventListener('scroll', hideCursor); window.removeEventListener('blur', hideCursor);
       strip.style.removeProperty('--gallery-sway'); strip.style.removeProperty('--gallery-bob');
       state.velocity = 0; state.remainder = 0; state.angle = 0; state.angularVelocity = 0;
     };
-  }, [reduced]);
+  }, [reduced, nativeScroll]);
   const move = (direction: number) => viewport.current?.scrollBy({ left: direction * viewport.current.clientWidth * .8, behavior: reduced ? 'auto' : 'smooth' });
   const finish = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (nativeScroll) return;
     if (event.pointerId !== drag.current.pointerId) return;
     if (event.timeStamp - drag.current.time > 100 || reduced || event.type === 'pointercancel') physics.current.velocity = 0;
     drag.current.active = false;
@@ -204,14 +220,15 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
     cursor.current.style.transform = `translate3d(${event.clientX}px,${event.clientY}px,0)`;
     cursor.current.classList.toggle('is-visible', event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom);
   };
-  return <div className="photo-gallery">
+  return <div className={`photo-gallery${nativeScroll ? ' gallery-native' : ''}`}>
     <div ref={viewport} className="gallery-viewport" role="region" aria-label="Galeria horizontal de fotografias" tabIndex={0}
       onKeyDown={(event) => { if (event.target === event.currentTarget && ['ArrowLeft', 'ArrowRight'].includes(event.key)) { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }}
       onFocusCapture={(event) => { physics.current.focus = event.target.matches(':focus-visible'); physics.current.velocity = 0; }}
       onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) physics.current.focus = false; }}
       onPointerEnter={(event) => { if (event.pointerType === 'mouse') physics.current.hover = true; positionCursor(event); }}
-      onPointerDown={(event) => { if (event.button !== 0 || !event.isPrimary) return; physics.current.velocity = 0; physics.current.remainder = 0; physics.current.touch = event.pointerType === 'touch'; drag.current = { x: event.clientX, y: event.clientY, lastX: event.clientX, time: event.timeStamp, pointerId: event.pointerId, active: true, moved: false }; cursor.current?.classList.add('is-pressed'); }}
+      onPointerDown={(event) => { if (nativeScroll || event.button !== 0 || !event.isPrimary) return; physics.current.velocity = 0; physics.current.remainder = 0; physics.current.touch = event.pointerType === 'touch'; drag.current = { x: event.clientX, y: event.clientY, lastX: event.clientX, time: event.timeStamp, pointerId: event.pointerId, active: true, moved: false }; cursor.current?.classList.add('is-pressed'); }}
       onPointerMove={(event) => {
+        if (nativeScroll) return;
         positionCursor(event);
         const gesture = drag.current;
         if (!gesture.active || event.pointerId !== gesture.pointerId) return;
@@ -233,7 +250,7 @@ function PhotoGallery({ onOpen, modalOpen }: { onOpen: (index: number) => void; 
       }}
       onPointerUp={finish} onPointerCancel={(event) => { finish(event); cursor.current?.classList.remove('is-visible'); }} onPointerLeave={(event) => { physics.current.hover = false; cursor.current?.classList.remove('is-visible'); if (event.pointerType === 'touch' || !drag.current.active) return; if (!drag.current.moved) finish(event); }} onLostPointerCapture={(event) => { if (event.target !== event.currentTarget || event.pointerId !== drag.current.pointerId) return; drag.current.active = false; viewport.current?.classList.remove('is-dragging'); cursor.current?.classList.remove('is-pressed'); }}
       onClickCapture={(event) => { if (drag.current.moved) { event.preventDefault(); event.stopPropagation(); drag.current.moved = false; } }}>
-      <div ref={track} className="gallery-track">{[0,1,2].map(cycle => <div className="gallery-cycle" key={cycle} aria-hidden={cycle !== 1 ? true : undefined}>{photos.map((photo, index) => <button key={photo.image} className={`gallery-card gallery-card-${index}`} tabIndex={cycle === 1 ? 0 : -1} aria-label={`Ampliar fotografia: ${photo.alt}`} onClick={() => { cursor.current?.classList.remove('is-visible'); physics.current.velocity = 0; onOpen(index); }}><span className="gallery-image"><img src={`/images/${photo.image}.webp`} alt={photo.alt} width="550" height="700" loading="lazy" draggable={false} /></span></button>)}</div>)}</div>
+      <div ref={track} className="gallery-track">{(nativeScroll ? [1] : [0,1,2]).map(cycle => <div className="gallery-cycle" key={cycle} aria-hidden={cycle !== 1 ? true : undefined}>{photos.map((photo, index) => <button key={photo.image} className={`gallery-card gallery-card-${index}`} tabIndex={cycle === 1 ? 0 : -1} aria-label={`Ampliar fotografia: ${photo.alt}`} onClick={() => { cursor.current?.classList.remove('is-visible'); physics.current.velocity = 0; onOpen(index); }}><span className="gallery-image"><img src={`/images/${photo.image}.webp`} alt={photo.alt} width="550" height="700" loading="lazy" draggable={false} /></span></button>)}</div>)}</div>
     </div>
     <div ref={cursor} className="gallery-drag-cursor" aria-hidden="true"><span><ArrowLeft size={18} />Arraste<ArrowRight size={18} /></span></div>
   </div>;
@@ -670,7 +687,7 @@ export default function App() {
     <footer className="site-footer" id="rodape" inert={loading}>
       <div className="footer-surface">
         <div className="footer-top">
-          <div className="footer-farewell" data-reveal><span className="eyebrow">A porta fica aberta</span><p className="footer-title"><AnimatedText text="Volta" /><br /><span><AnimatedText text="sempre!" /></span></p><p className="footer-tagline">GuudPet. Já és de casa.</p></div>
+          <div className="footer-farewell" data-reveal><span className="eyebrow">A porta fica aberta</span><p className="footer-title"><AnimatedText text="Volte" /><br /><span><AnimatedText text="sempre!" /></span></p><p className="footer-tagline">GuudPet. Já és de casa.</p></div>
           <nav className="footer-directory" aria-label="Navegação do rodapé"><span className="eyebrow">Por aqui</span><div>{footerLinks.map(([label, id]) => <a key={id} href={`#${id}`}>{label}<ArrowUpRight size={17} aria-hidden="true" /></a>)}</div></nav>
         </div>
         <div className="footer-signature">
